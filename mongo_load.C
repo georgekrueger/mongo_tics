@@ -50,7 +50,7 @@ int main(int argc, char** argv)
     c.insert("tutorial.persons", p);
     string e = c.getLastError();
     if (!e.empty()) {
-        cout << "insert failed: " << e << endl;
+        std::cout << "insert failed: " << e << std::endl;
     }
 
 
