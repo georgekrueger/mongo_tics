@@ -8,8 +8,7 @@
 #include <boost/iostreams/filtering_stream.hpp>
 #include <boost/iostreams/filter/gzip.hpp>
 #include <boost/iostreams/copy.hpp>
-#include <mongoc.h>
-#include <bson.h>
+#include <mongo/client/dbclient.h>
 
 std::map<std::string, std::string> ticks;
 
@@ -31,38 +30,16 @@ int main(int argc, char** argv)
     unsigned long long total_char_count = 0;
     unsigned long long total_line_count = 0;
     unsigned int partition = 0;
-    bson_error_t error;
 
-    mongoc_init();
+    mongo::client::initialize();
+    mongo::DBClientConnection c;
 
-    /*
-    * Safely create a MongoDB URI object from the given string
-    */
-
-    const char* uri_string = "mongodb://nutmeg:27017";
-    mongoc_uri_t* uri = mongoc_uri_new_with_error (uri_string, &error);
-    if (!uri) {
-    fprintf (stderr,
-           "failed to parse URI: %s\n"
-           "error message:       %s\n",
-           uri_string,
-           error.message);
-    return EXIT_FAILURE;
+    try {
+        c.connect("nutmeg");
+        std::cout << "connected ok" << std::endl;
+    } catch( const mongo::DBException &e ) {
+        std::cout << "caught " << e.what() << std::endl;
     }
-
-    /*
-    * Create a new client instance
-    */
-    mongoc_client_t* client = mongoc_client_new_from_uri (uri);
-    if (!client) {
-    return EXIT_FAILURE;
-    }
-
-    /*
-    * Register the application name so we can track it in the profile logs
-    * on the server. This can also be done from the URI (see other examples).
-    */
-    mongoc_client_set_appname (client, "connect-example");
 
     try
     {
