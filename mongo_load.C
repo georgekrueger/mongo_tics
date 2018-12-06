@@ -9,6 +9,7 @@
 #include <boost/iostreams/filter/gzip.hpp>
 #include <boost/iostreams/copy.hpp>
 #include <mongo/client/dbclient.h>
+#include <mongo/bson/bson.h>
 
 std::map<std::string, std::string> ticks;
 
@@ -40,6 +41,13 @@ int main(int argc, char** argv)
     } catch( const mongo::DBException &e ) {
         std::cout << "caught " << e.what() << std::endl;
     }
+
+    mongo::BSONObjBuilder b;
+    b.append("name", "Joe");
+    b.append("age", 33);
+    BSONObj p = b.obj();
+
+    c.insert("tutorial.persons", b.obj());
 
     try
     {
