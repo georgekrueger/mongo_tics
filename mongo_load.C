@@ -49,6 +49,7 @@ int main(int argc, char** argv)
 
     c.insert("tutorial.persons", p);
 
+    /*
     try
     {
         // skip first line that is version number
@@ -146,6 +147,7 @@ int main(int argc, char** argv)
     {
         std::cerr << "error reading compressed file " << tick_file_name << std::endl;
     }
+    */
 
     return 0;
 }
