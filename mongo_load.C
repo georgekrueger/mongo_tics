@@ -48,6 +48,11 @@ int main(int argc, char** argv)
     mongo::BSONObj p = b.obj();
 
     c.insert("tutorial.persons", p);
+    string e = c.getLastError();
+    if (!e.empty()) {
+        cout << "insert failed: " << e << endl;
+    }
+
 
     /*
     try
