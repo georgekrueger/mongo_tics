@@ -55,6 +55,8 @@ int main(int argc, char** argv)
     }
 
 
+    mongo::client::shutdown();
+
     /*
     try
     {
