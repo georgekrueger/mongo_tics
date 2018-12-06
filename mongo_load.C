@@ -45,9 +45,9 @@ int main(int argc, char** argv)
     mongo::BSONObjBuilder b;
     b.append("name", "Joe");
     b.append("age", 33);
-    BSONObj p = b.obj();
+    mongo::BSONObj p = b.obj();
 
-    c.insert("tutorial.persons", b.obj());
+    c.insert("tutorial.persons", p));
 
     try
     {
