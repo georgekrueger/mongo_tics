@@ -47,7 +47,7 @@ int main(int argc, char** argv)
     b.append("age", 33);
     mongo::BSONObj p = b.obj();
 
-    c.insert("tutorial.persons", p));
+    c.insert("tutorial.persons", p);
 
     try
     {
