@@ -9,8 +9,11 @@
 #include <boost/iostreams/filtering_stream.hpp>
 #include <boost/iostreams/filter/gzip.hpp>
 #include <boost/iostreams/copy.hpp>
-#include <mongo/client/dbclient.h>
-#include <mongo/bson/bson.h>
+
+#include <bsoncxx/builder/stream/document.hpp>
+#include <bsoncxx/json.hpp>
+#include <mongocxx/client.hpp>
+#include <mongocxx/instance.hpp>
 
 std::map<std::string, std::string> ticks;
 
@@ -33,31 +36,11 @@ int main(int argc, char** argv)
     unsigned long long total_line_count = 0;
     unsigned int partition = 0;
 
-    mongo::client::initialize();
-    mongo::DBClientConnection c;
+    mongocxx::instance inst{};
+    mongocxx::client conn{mongocxx::uri{"mongodb://nutmeg:27017"}};
 
-    try {
-        c.connect("nutmeg");
-        std::cout << "connected ok" << std::endl;
-    } catch( const mongo::DBException &e ) {
-        std::cout << "caught " << e.what() << std::endl;
-    }
+    std::map<std::string, bsoncxx::builder::stream::document> docs;    
 
-    mongo::BSONObjBuilder b;
-    b.append("name", "Joe");
-    b.append("age", 33);
-    mongo::BSONObj p = b.obj();
-
-    c.insert("tutorial.persons", p);
-    std::string e = c.getLastError();
-    if (!e.empty()) {
-        std::cout << "insert failed: " << e << std::endl;
-    }
-
-
-    mongo::client::shutdown();
-
-    /*
     try
     {
         // skip first line that is version number
@@ -155,7 +138,6 @@ int main(int argc, char** argv)
     {
         std::cerr << "error reading compressed file " << tick_file_name << std::endl;
     }
-    */
 
     return 0;
 }
