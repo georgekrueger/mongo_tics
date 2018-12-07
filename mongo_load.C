@@ -95,10 +95,6 @@ int main(int argc, char** argv)
                 }*/
                 auto attr_iter = attr_map.find(attr);
                 if (attr_iter == attr_map.end()) {
-                    //auto* new_doc = new bsoncxx::builder::basic::document;
-                    //attr_map.insert(std::make_pair(attr, new_doc));
-                    //new_doc->append(bsoncxx::builder::basic::kvp("contract", symbol));
-                    //new_doc->append(bsoncxx::builder::basic::kvp("attr", attr));
                     attr_map[attr].push_back(std::make_pair(microseconds, value));
                 }
             }
@@ -119,6 +115,8 @@ int main(int argc, char** argv)
 
     mongocxx::instance inst{};
     mongocxx::client conn{mongocxx::uri{"mongodb://nutmeg:27017"}};
+    auto coll = conn["tics2"]["tics2"];
+    auto bulk = coll.create_bulk_write();
 
     for (auto& kv : values)
     {
@@ -127,17 +125,36 @@ int main(int argc, char** argv)
         for (auto& attr_kv : attr_map)
         {
             auto& attr = attr_kv.first;
-            bsoncxx::builder::basic::document doc;
-            doc.append(bsoncxx::builder::basic::kvp("contract", symbol));
-            doc.append(bsoncxx::builder::basic::kvp("attr", attr));
-            bsoncxx::builder::basic::array value_arr;
-            for (auto& value : attr_kv.second) {
-                value_arr.append(value.first);
-                value_arr.append(value.second);
+            auto& attr_values = attr_kv.second;
+
+            int partition_size = 100000;
+            for (int partition = 0; ; ++partition) {
+                if (partition * partition_size >= attr_values.size()) {
+                    break;
+                }
+                bsoncxx::builder::basic::document doc;
+                doc.append(bsoncxx::builder::basic::kvp("contract", symbol));
+                doc.append(bsoncxx::builder::basic::kvp("attr", attr));
+                doc.append(bsoncxx::builder::basic::kvp("partition", partition));
+                bsoncxx::builder::basic::array value_arr;
+                for (int i = partition * partition_size; i < (partition + 1) * partition_size; ++i) {
+                    value_arr.append(attr_values[i].first);
+                    value_arr.append(attr_values[i].second);
+                }
+                doc.append(bsoncxx::builder::basic::kvp("values", value_arr));
+                mongocxx::model::insert_one insert_op(doc.view());
+                bulk.append(insert_op);
             }
-            doc.append(bsoncxx::builder::basic::kvp("values", value_arr));
         }
+    }
+
+    std::cout << "start bulk insert" << std::endl;
+    auto result = coll.bulk_write(bulk);
+    if (result) {
+        std::cout << "inserted: " << result->inserted_count() << std::endl;
     }
 
     return 0;
 }
+
+//void write_values(std::string contract, std::string attr, std:)
