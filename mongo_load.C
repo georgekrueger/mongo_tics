@@ -1,3 +1,4 @@
+
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -36,9 +37,6 @@ int main(int argc, char** argv)
     unsigned long long total_char_count = 0;
     unsigned long long total_line_count = 0;
     unsigned int partition = 0;
-
-    mongocxx::instance inst{};
-    mongocxx::client conn{mongocxx::uri{"mongodb://nutmeg:27017"}};
 
     //std::map<std::string, std::map<std::string, bsoncxx::builder::basic::document*>> docs;
     std::map<std::string, std::map<std::string, std::vector<std::pair<int64_t, std::string>>>> values;
@@ -117,6 +115,28 @@ int main(int argc, char** argv)
     catch(const boost::iostreams::gzip_error& exception)
     {
         std::cerr << "error reading compressed file " << tick_file_name << std::endl;
+    }
+
+    mongocxx::instance inst{};
+    mongocxx::client conn{mongocxx::uri{"mongodb://nutmeg:27017"}};
+
+    for (auto& kv : values)
+    {
+        auto& symbol = kv.first;
+        auto& attr_map = kv.second;
+        for (auto& attr_kv : attr_map)
+        {
+            auto& attr = attr_kv.first;
+            bsoncxx::builder::basic::document doc;
+            doc.append(bsoncxx::builder::basic::kvp("contract", symbol));
+            doc.append(bsoncxx::builder::basic::kvp("attr", attr));
+            bsoncxx::builder::basic::array value_arr;
+            for (auto& value : attr_kv.second) {
+                value_arr.append(value.first);
+                value_arr.append(value.second);
+            }
+            doc.append(bsoncxx::builder::basic::kvp("values", value_arr));
+        }
     }
 
     return 0;
