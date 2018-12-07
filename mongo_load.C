@@ -6,6 +6,7 @@
 #include <memory>
 #include <map>
 #include <string>
+#include <utility>
 #include <boost/iostreams/filtering_stream.hpp>
 #include <boost/iostreams/filter/gzip.hpp>
 #include <boost/iostreams/copy.hpp>
@@ -39,7 +40,8 @@ int main(int argc, char** argv)
     mongocxx::instance inst{};
     mongocxx::client conn{mongocxx::uri{"mongodb://nutmeg:27017"}};
 
-    std::map<std::string, bsoncxx::builder::stream::document> docs;    
+    //std::map<std::string, std::map<std::string, bsoncxx::builder::basic::document*>> docs;
+    std::map<std::string, std::map<std::string, std::vector<std::pair<int64_t, std::string>>>> values;
 
     try
     {
@@ -64,7 +66,7 @@ int main(int argc, char** argv)
 
             unsigned long seconds = stoul(seconds_str);
             unsigned long sub_seconds = stoul(sub_seconds_str);
-//            auto mongo_date_time = mongo::Date_t((seconds * 1000) + (sub_seconds / 1000));
+            int64_t microseconds = seconds * 1000000 + sub_seconds;
 
             // get symbol
             std::string symbol;
@@ -79,55 +81,33 @@ int main(int argc, char** argv)
                 //std::cout << "update" << std::endl;
             }
 
+            auto& attr_map = values[symbol];
+
             // get attributes
             std::string attr;
             while (std::getline(line_stream, attr, '\001')) {
                 std::string value;
                 std::getline(line_stream, value, '\001');
-                //std::cout << attr << ": " << value << std::endl;
+                /*bool int_val_set = false;
+                try {
+                    int int_val = stoi(value);
+                    int_val_set = true;
+                }
+                catch(std::invalid_argument& iae) {
+                }*/
+                auto attr_iter = attr_map.find(attr);
+                if (attr_iter == attr_map.end()) {
+                    //auto* new_doc = new bsoncxx::builder::basic::document;
+                    //attr_map.insert(std::make_pair(attr, new_doc));
+                    //new_doc->append(bsoncxx::builder::basic::kvp("contract", symbol));
+                    //new_doc->append(bsoncxx::builder::basic::kvp("attr", attr));
+                    attr_map[attr].push_back(std::make_pair(microseconds, value));
+                }
             }
 
             if (total_line_count % 1000000 == 0) {
                 std::cout << (total_line_count / 1000000.0) << "M" << std::endl;
             }
-
-//            if (total_line_count % 15000000 == 0) {
-////                mongo::DBClientConnection c;
-////                try {
-////                    std::cout << "connect to mongodb and upload data" << std::endl;
-////                    c.connect("localhost");
-////                } catch( const mongo::DBException &e ) {
-////                    std::cout << "caught " << e.what() << std::endl;
-////                }
-
-//                for (auto& kv : ticks)
-//                {
-//                    auto symbol = kv.first;
-//                    auto data = kv.second;
-//                    std::cout << symbol << ": " << data.size() << std::endl;
-
-//                    std::stringstream in_stream;
-//                    in_stream << data;
-//                    std::ostringstream out_stream;
-//                    //std::ofstream out_stream("data/" + symbol + ".gz", std::ios_base::out);
-//                    boost::iostreams::filtering_streambuf< boost::iostreams::input> in;
-//                    in.push( boost::iostreams::gzip_compressor());
-//                    in.push( in_stream );
-//                    boost::iostreams::copy(in, out_stream);
-
-////                    mongo::BSONObjBuilder b;
-////                    b.genOID();
-////                    b.append("symbol", symbol);
-////                    b.append("date", "20181113");
-////                    b.append("partition", partition);
-////                    b.append("data", out_stream.str());
-////                    mongo::BSONObj p = b.obj();
-
-////                    c.insert("tics.tics", p);
-//                }
-//                ticks.clear();
-//                partition++;
-//            }
         }
 
         std::cout << "total char count: " << total_char_count << std::endl;
