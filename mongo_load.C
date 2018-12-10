@@ -17,8 +17,6 @@
 #include <mongocxx/client.hpp>
 #include <mongocxx/instance.hpp>
 
-std::map<std::string, std::string> ticks;
-
 int main(int argc, char** argv)
 {
     std::string tick_file_name = "/data/2018/11/13/tics/cme_11_F.0.gz";
@@ -93,10 +91,7 @@ int main(int argc, char** argv)
                 }
                 catch(std::invalid_argument& iae) {
                 }*/
-                auto attr_iter = attr_map.find(attr);
-                if (attr_iter == attr_map.end()) {
-                    attr_map[attr].push_back(std::make_pair(microseconds, value));
-                }
+                attr_map[attr].push_back(std::make_pair(microseconds, value));
             }
 
             if (total_line_count % 1000000 == 0) {
@@ -113,20 +108,26 @@ int main(int argc, char** argv)
         std::cerr << "error reading compressed file " << tick_file_name << std::endl;
     }
 
+    std::cout << "connect to mongodb and insert values" << std::endl;
+
     mongocxx::instance inst{};
     mongocxx::client conn{mongocxx::uri{"mongodb://nutmeg:27017"}};
     auto coll = conn["tics2"]["tics2"];
     auto bulk = coll.create_bulk_write();
+    unsigned int max_bulk = 1000;
+    unsigned int bulk_count = 0;
 
     for (auto& kv : values)
     {
         auto& symbol = kv.first;
         auto& attr_map = kv.second;
+        std::cout << "insert data for " << symbol << std::endl;
         for (auto& attr_kv : attr_map)
         {
             auto& attr = attr_kv.first;
             auto& attr_values = attr_kv.second;
 
+            //std::cout << " " << attr << " " << attr_values.size() << " values" << std::endl;
             int partition_size = 100000;
             for (int partition = 0; ; ++partition) {
                 if (partition * partition_size >= attr_values.size()) {
@@ -137,22 +138,34 @@ int main(int argc, char** argv)
                 doc.append(bsoncxx::builder::basic::kvp("attr", attr));
                 doc.append(bsoncxx::builder::basic::kvp("partition", partition));
                 bsoncxx::builder::basic::array value_arr;
-                for (int i = partition * partition_size; i < (partition + 1) * partition_size; ++i) {
+                for (int i = partition * partition_size; i < (partition + 1) * partition_size && i < attr_values.size(); ++i) {
                     value_arr.append(attr_values[i].first);
                     value_arr.append(attr_values[i].second);
                 }
                 doc.append(bsoncxx::builder::basic::kvp("values", value_arr));
                 mongocxx::model::insert_one insert_op(doc.view());
                 bulk.append(insert_op);
+                bulk_count++;
+                if (bulk_count >= max_bulk) {
+                    std::cout << "write batch to mongodb" << std::endl;
+                    auto result = coll.bulk_write(bulk);
+                    if (result) {
+                        std::cout << "inserted: " << result->inserted_count() << std::endl;
+                    }
+                    bulk_count = 0;
+                    bulk = coll.create_bulk_write();
+                }
             }
         }
     }
 
-    std::cout << "start bulk insert" << std::endl;
+    std::cout << "write final batch to mongodb" << std::endl;
     auto result = coll.bulk_write(bulk);
     if (result) {
         std::cout << "inserted: " << result->inserted_count() << std::endl;
     }
+
+    std::cout << "done" << std::endl;
 
     return 0;
 }
