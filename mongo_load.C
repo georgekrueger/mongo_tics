@@ -8,6 +8,7 @@
 #include <map>
 #include <string>
 #include <utility>
+#include <variant>
 #include <boost/iostreams/filtering_stream.hpp>
 #include <boost/iostreams/filter/gzip.hpp>
 #include <boost/iostreams/copy.hpp>
@@ -16,6 +17,8 @@
 #include <bsoncxx/json.hpp>
 #include <mongocxx/client.hpp>
 #include <mongocxx/instance.hpp>
+
+using std::string;
 
 int main(int argc, char** argv)
 {
@@ -37,7 +40,9 @@ int main(int argc, char** argv)
     unsigned int partition = 0;
 
     //std::map<std::string, std::map<std::string, bsoncxx::builder::basic::document*>> docs;
-    std::map<std::string, std::map<std::string, std::vector<std::pair<int64_t, std::string>>>> values;
+    typedef std::variant<std::string, int, long> Value;
+    typedef std::map<std::string, std::vector<std::pair<int64_t, Value>>> AttrMap;
+    std::map<std::string, AttrMap> values;
 
     try
     {
@@ -82,15 +87,22 @@ int main(int argc, char** argv)
             // get attributes
             std::string attr;
             while (std::getline(line_stream, attr, '\001')) {
-                std::string value;
-                std::getline(line_stream, value, '\001');
-                /*bool int_val_set = false;
+                string str_value;
+                std::getline(line_stream, str_value, '\001');
+                Value value;
                 try {
-                    int int_val = stoi(value);
-                    int_val_set = true;
+                    int int_val = stoi(str_value);
+                    value = int_val;
                 }
-                catch(std::invalid_argument& iae) {
-                }*/
+                catch(std::exception& exception) {
+                    try {
+                        long long_val = stol(str_value);
+                        value = long_val;
+                    }
+                    catch(std::exception& exception) {
+                        value = str_value;
+                    }
+                }
                 attr_map[attr].push_back(std::make_pair(microseconds, value));
             }
 
@@ -140,7 +152,8 @@ int main(int argc, char** argv)
                 bsoncxx::builder::basic::array value_arr;
                 for (int i = partition * partition_size; i < (partition + 1) * partition_size && i < attr_values.size(); ++i) {
                     value_arr.append(attr_values[i].first);
-                    value_arr.append(attr_values[i].second);
+                    Value& value = attr_values[i].second;
+                    std::visit([&value_arr](auto&& arg) { value_arr.append(arg); }, value);
                 }
                 doc.append(bsoncxx::builder::basic::kvp("values", value_arr));
                 mongocxx::model::insert_one insert_op(doc.view());
