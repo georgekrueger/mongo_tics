@@ -149,18 +149,20 @@ int main(int argc, char** argv)
                 doc.append(bsoncxx::builder::basic::kvp("contract", symbol));
                 doc.append(bsoncxx::builder::basic::kvp("attr", attr));
                 doc.append(bsoncxx::builder::basic::kvp("partition", partition));
+                bsoncxx::builder::basic::array ts_arr;
                 bsoncxx::builder::basic::array value_arr;
                 for (int i = partition * partition_size; i < (partition + 1) * partition_size && i < attr_values.size(); ++i) {
-                    value_arr.append(attr_values[i].first);
+                    ts_arr.append(attr_values[i].first);
                     Value& value = attr_values[i].second;
                     std::visit([&value_arr](auto&& arg) { value_arr.append(arg); }, value);
                 }
                 doc.append(bsoncxx::builder::basic::kvp("values", value_arr));
+                doc.append(bsoncxx::builder::basic::kvp("timestamps", ts_arr));
                 mongocxx::model::insert_one insert_op(doc.view());
                 bulk.append(insert_op);
                 bulk_count++;
                 if (bulk_count >= max_bulk) {
-                    std::cout << "write batch to mongodb" << std::endl;
+                    std::cout << "write batch" << std::endl;
                     auto result = coll.bulk_write(bulk);
                     if (result) {
                         std::cout << "inserted: " << result->inserted_count() << std::endl;
@@ -172,7 +174,7 @@ int main(int argc, char** argv)
         }
     }
 
-    std::cout << "write final batch to mongodb" << std::endl;
+    std::cout << "write final batch" << std::endl;
     auto result = coll.bulk_write(bulk);
     if (result) {
         std::cout << "inserted: " << result->inserted_count() << std::endl;
